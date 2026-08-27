@@ -1,0 +1,4 @@
+This addon includes a GDExtension built with godot-cpp (MIT License).
+Copyright (c) 2017-present Godot Engine contributors.
+
+See https://github.com/godotengine/godot-cpp

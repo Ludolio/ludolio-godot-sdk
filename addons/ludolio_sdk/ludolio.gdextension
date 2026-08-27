@@ -1,0 +1,24 @@
+[configuration]
+entry_symbol = "ludolio_library_init"
+compatibility_minimum = "4.3"
+reloadable = false
+
+[libraries]
+windows.debug.x86_64 = "res://addons/ludolio_sdk/bin/windows/ludolio_godot.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/ludolio_sdk/bin/windows/ludolio_godot.windows.template_release.x86_64.dll"
+macos.debug = "res://addons/ludolio_sdk/bin/macos/libludolio_godot.macos.template_debug.universal.dylib"
+macos.release = "res://addons/ludolio_sdk/bin/macos/libludolio_godot.macos.template_release.universal.dylib"
+
+[dependencies]
+windows.debug.x86_64 = {
+    "res://addons/ludolio_sdk/bin/windows/LudolioSDK.dll": ""
+}
+windows.release.x86_64 = {
+    "res://addons/ludolio_sdk/bin/windows/LudolioSDK.dll": ""
+}
+macos.debug = {
+    "res://addons/ludolio_sdk/bin/macos/LudolioSDK.dylib": ""
+}
+macos.release = {
+    "res://addons/ludolio_sdk/bin/macos/LudolioSDK.dylib": ""
+}

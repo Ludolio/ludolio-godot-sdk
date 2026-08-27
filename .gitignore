@@ -1,0 +1,17 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Godot generated
+**/.godot/
+**/*.os
+
+# Private GDExtension build
+extension/
+godot-cpp/
