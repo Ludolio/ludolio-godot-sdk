@@ -11,6 +11,9 @@ Thumbs.db
 # Godot generated
 **/.godot/
 **/*.os
+**/*.obj
+**/*.exp
+**/*.lib
 
 # Private GDExtension build
 extension/
