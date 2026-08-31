@@ -32,7 +32,7 @@ GDScript and C# call the same singleton. There is no separate C# assembly in thi
 2. The client sets `LUDOLIO_SESSION` on the game process and starts the executable.
 3. Your game initializes `Ludolio` with your App ID.
 4. On initialization success you call `authenticate`.
-5. After authentication succeeds, achievements, stats, and user APIs are available.
+5. After authentication succeeds, achievements, stats, and `request_user_info` are available. `get_user_id` is already valid after initialize.
 
 Godot drops unknown `--` flags before they reach GDScript. The desktop client sets `LUDOLIO_SESSION` so the token reaches the game whether or not a `.pck` sits next to the executable. Command-line `--ludolio-session` is still read as a fallback (`OS.get_cmdline_user_args()`, then `OS.get_cmdline_args()`).
 
@@ -81,7 +81,7 @@ Games must be launched through the Ludolio Desktop Client. Initialization fails 
 
 ## Quick Start
 
-Initialize as early as possible. Connect signals before initialize. Call `authenticate` only after `initialization_complete` succeeds. Wait for `authentication_complete` before user data, achievements, or stats.
+Initialize as early as possible. Connect signals before initialize. Call `authenticate` only after `initialization_complete` succeeds. Wait for `authentication_complete` before `request_user_info`, achievements, or stats. `get_user_id` is valid after initialize; `get_user_name` is not.
 
 App ID, achievement API names, and stat API names come from the Ludolio Developer Dashboard.
 
@@ -321,7 +321,7 @@ Ludolio.initialization_complete.connect(func(success: bool, error: String) -> vo
 
 ##### `authentication_complete(success: bool, error: String)`
 
-Fired when authenticate finishes. Wait for `success == true` before user data, achievements, or stats.
+Fired when authenticate finishes. Wait for `success == true` before `request_user_info`, achievements, or stats. `get_user_id` is already valid after initialize.
 
 ```gdscript
 Ludolio.authentication_complete.connect(func(success: bool, error: String) -> void:
@@ -361,7 +361,7 @@ func _on_user_info_received(success: bool, user_info: Dictionary, error: String)
 
 ##### `get_user_id() -> String`
 
-Synchronous accessor for the current user ID. Empty if not initialized or not authenticated.
+Synchronous accessor for the current user ID. After `initialize_with_app_id` succeeds, this is the user id from the session token. Empty if the SDK is not initialized.
 
 ```gdscript
 var user_id := Ludolio.get_user_id()
@@ -369,13 +369,13 @@ var user_id := Ludolio.get_user_id()
 
 ##### `get_user_name() -> String`
 
-Synchronous accessor for the current user name. Empty if not available.
+Synchronous accessor for the current user name. Empty until `authenticate` succeeds.
 
 ```gdscript
 var user_name := Ludolio.get_user_name()
 ```
 
-**Important:** Do not call these immediately after `initialize_with_app_id()`. Wait for `authentication_complete` with `success == true`.
+**Important:** Wait for `authentication_complete` with `success == true` before `request_user_info`, achievements, or stats. `get_user_id` is already valid after initialize. `get_user_name` is not.
 
 ### Achievements
 
@@ -455,7 +455,7 @@ func _on_achievements_received(success: bool, achievements: Array, error: String
 | `locked_icon_url` | `String` | Icon URL when locked |
 | `unlocked_icon_url` | `String` | Icon URL when unlocked |
 | `unlocked` | `bool` | Whether the current user has unlocked it |
-| `unlocked_at` | `String` | ISO-8601 timestamp, or empty if locked |
+| `unlocked_at` | `Variant` | ISO-8601 timestamp when unlocked; `null` if locked. Check `unlocked`, not this field. |
 
 ##### `is_achievement_unlocked(achievement_id: String) -> bool`
 
@@ -470,10 +470,11 @@ The local cache used by this method is populated by `request_achievements` and b
 
 ##### `clear_achievement_cache()`
 
-Clear the native achievement cache to force a refresh.
+Clear the native achievement cache. This does not fetch from the server. After a clear, `is_achievement_unlocked` returns `false` until you call `request_achievements` or unlock again in this session.
 
 ```gdscript
 Ludolio.clear_achievement_cache()
+Ludolio.request_achievements()
 ```
 
 ### Stats
@@ -501,9 +502,9 @@ Ludolio.stats_requested.connect(func(success: bool, error: String) -> void:
 
 ##### `get_stat_int(stat_id: String) -> Variant`
 
-Get an integer stat value. `request_stats` must complete first.
+Get an integer stat value. `request_stats` must complete first. The API Name must match an INT stat on the dashboard.
 
-Returns the integer, or `null` if the stat was not found or stats are not loaded.
+Returns the integer, or `null` if stats are not loaded, the API Name is unknown, or the stat is not INT. Use `get_stat_float` for FLOAT and AVGRATE. A stored `0` is a real value, not `null`.
 
 ```gdscript
 var kills = Ludolio.get_stat_int("kills")
@@ -513,9 +514,9 @@ if kills != null:
 
 ##### `get_stat_float(stat_id: String) -> Variant`
 
-Get a float stat value. `request_stats` must complete first.
+Get a float stat value. `request_stats` must complete first. The API Name must match a FLOAT or AVGRATE stat on the dashboard.
 
-Returns the float, or `null` if the stat was not found or stats are not loaded.
+Returns the float, or `null` if stats are not loaded, the API Name is unknown, or the stat is not FLOAT/AVGRATE.
 
 ```gdscript
 var hours = Ludolio.get_stat_float("playtime")
@@ -525,23 +526,23 @@ if hours != null:
 
 ##### `set_stat_int(stat_id: String, value: int) -> bool`
 
-Set an integer stat value. Changes are cached locally until `store_stats` is called.
+Set an integer stat that already exists on the dashboard. `request_stats` must have succeeded. This cannot create a new stat. Changes are cached locally until `store_stats`.
 
 ```gdscript
 Ludolio.set_stat_int("kills", 10)
 ```
 
-**Returns:** `true` if successful
+**Returns:** `true` if the local cache updated. `false` if stats are not loaded, the API Name is unknown, or the stat is not INT. Check the return value; a failed set is not stored.
 
 ##### `set_stat_float(stat_id: String, value: float) -> bool`
 
-Set a float stat value. Changes are cached locally until `store_stats` is called.
+Set a FLOAT or AVGRATE stat that already exists on the dashboard. Same cache rules as `set_stat_int`.
 
 ```gdscript
 Ludolio.set_stat_float("playtime", 2.5)
 ```
 
-**Returns:** `true` if successful
+**Returns:** `true` if the local cache updated. `false` if stats are not loaded, the API Name is unknown, or the type is not FLOAT/AVGRATE.
 
 ##### `store_stats()`
 
@@ -553,7 +554,7 @@ Ludolio.store_stats()
 
 ##### `stats_stored(success: bool, result_text: String)`
 
-Fired when a store attempt finishes. `result_text` is empty on success and contains an error message on failure.
+Fired when a store attempt finishes. Branch on `success`. On success, `result_text` is a JSON payload from the native SDK (for example `{"results":[]}`), not an empty string. On failure it is an error message.
 
 ```gdscript
 Ludolio.stats_stored.connect(func(success: bool, result_text: String) -> void:
@@ -587,8 +588,8 @@ DRM-free uploads do not receive `LUDOLIO_SESSION`. The SDK will fail to initiali
 3. **Authenticate after init** - Call `authenticate()` only after `initialization_complete` succeeds.
 4. **Wait for authentication** - Wait for `authentication_complete` before enabling SDK-backed gameplay.
 5. **Load stats before get/set** - Call `request_stats` after authentication and wait for `stats_requested`.
-6. **Check `null` on stats** - `get_stat_int` and `get_stat_float` return `null` when the stat is missing.
-7. **Use dashboard API Names** - Achievement and stat strings must match the developer dashboard.
+6. **Check `null` on stats** - `get_stat_int` and `get_stat_float` return `null` when the stat is missing, not loaded, or the wrong type. A stored `0` is a real value.
+7. **Use dashboard API Names** - Achievement and stat strings must match the developer dashboard. `set_stat_*` cannot create a stat.
 8. **Store at key moments** - Call `store_stats` on level complete, pause, or a timer.
 9. **Disconnect signals** - Disconnect in `_exit_tree` if the node can leave the tree while the singleton remains.
 10. **Handle missing session** - Godot does not quit the process. Show an error if initialize fails.
@@ -649,8 +650,11 @@ The usual missing-session message is: `Missing Ludolio session. Launch the game 
 **Solutions:**
 
 - Wait for `stats_requested` with `success == true` before get/set
-- Confirm the stat API Name matches the dashboard
+- Confirm the stat API Name exists on the dashboard
+- Use `get_stat_int` for INT and `get_stat_float` for FLOAT or AVGRATE
+- Confirm `set_stat_*` returned `true` before relying on `store_stats`
 - Confirm you called `store_stats` after `set_stat_*`
+- Branch on `stats_stored` `success`, not on whether `result_text` is empty
 - Confirm the user is authenticated
 
 ### Native library missing in the export

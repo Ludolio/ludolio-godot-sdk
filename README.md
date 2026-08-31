@@ -6,7 +6,7 @@ See [Docs/LudolioSDK.md](Docs/LudolioSDK.md) for the complete walkthrough, per-m
 
 ## Quick Reference
 
-Initialize as early as possible, from the main scene `_ready` or an autoload. Connect signals before calling initialize. After initialization succeeds, call `authenticate`. Wait for authentication before using user data, achievements, or stats.
+Initialize as early as possible, from the main scene `_ready` or an autoload. Connect signals before calling initialize. After initialization succeeds, call `authenticate`. Wait for authentication before achievements, stats, `request_user_info`, or `get_user_name`. `get_user_id` is available after initialize succeeds.
 
 ```gdscript
 func _ready() -> void:
@@ -44,7 +44,7 @@ Ludolio.set_stat_int("kills", next_kills)
 Ludolio.store_stats()
 ```
 
-**Important:** Always wait for `authentication_complete` with `success == true` before accessing user data or SDK features. In Godot this fires after you call `authenticate()`, not immediately after initialize.
+**Important:** Always wait for `authentication_complete` with `success == true` before achievements, stats, `request_user_info`, or `get_user_name`. `get_user_id` is available after initialize succeeds. In Godot, `authentication_complete` fires after you call `authenticate()`, not immediately after initialize.
 
 ## Features
 
@@ -94,7 +94,7 @@ addons/ludolio_sdk/bin/macos/libludolio_godot.macos.template_release.universal.d
 4. Open the project in Godot. Enable **Ludolio SDK** under **Project > Project Settings > Plugins**.
 5. Restart the editor if the `Ludolio` singleton is missing from the autocomplete list.
 
-Pin a version by downloading that GitHub release tag (for example `v0.1.0`) instead of cloning `main`.
+Pin a version by downloading that GitHub release tag (for example `v0.2.0`) instead of cloning `main`.
 
 Games must be launched through the Ludolio Desktop Client. The client sets `LUDOLIO_SESSION` on the game process and also passes a session argument. Initialization fails without that session, including in the editor.
 
@@ -204,7 +204,7 @@ func _on_achievements_received(success: bool, achievements: Array, error: String
 
 Stats work like Steamworks: request from server, get/set locally, then store back.
 
-`get_stat_int` and `get_stat_float` return the value, or `null` if the stat is missing or stats are not loaded yet. Check for `null` before arithmetic.
+`get_stat_int` and `get_stat_float` return the value, or `null` if the stat is missing, stats are not loaded, or you used the wrong type (`get_stat_int` on a FLOAT, or the reverse). Check for `null` before arithmetic. `set_stat_*` only updates a stat that already exists on the dashboard; it cannot create one.
 
 **Step 1: Load stats after authentication**
 
@@ -275,7 +275,7 @@ func _on_user_info_received(success: bool, user_info: Dictionary, error: String)
     print("Welcome, ", user_info.get("user_name", ""))
 ```
 
-**Important:** User data is only available after `authentication_complete` fires with `success == true`. Do not call these methods immediately after `initialize_with_app_id()`.
+**Important:** `get_user_name` and `request_user_info` are only available after `authentication_complete` fires with `success == true`. `get_user_id` is already valid after initialize succeeds.
 
 ### C#
 
@@ -337,8 +337,8 @@ All APIs live on the `Ludolio` Engine singleton.
 | `is_initialized()` | `bool` | `true` if the native SDK is initialized |
 | `is_authenticated()` | `bool` | `true` if the user is authenticated |
 | `get_game_id()` | `String` | Current game ID |
-| `get_user_id()` | `String` | Current user ID (empty if not authenticated) |
-| `get_user_name()` | `String` | Current user name (empty if not available) |
+| `get_user_id()` | `String` | Current user ID after initialize (empty if not initialized) |
+| `get_user_name()` | `String` | Current user name (empty until authenticate succeeds) |
 | `get_last_error()` | `String` | Last error message from the SDK |
 
 ### User
@@ -356,19 +356,19 @@ All APIs live on the `Ludolio` Engine singleton.
 | `unlock_achievement(achievement_id: String)` | Unlock by dashboard API Name |
 | `request_achievements()` | Load all achievements; result on `achievements_received` |
 | `is_achievement_unlocked(achievement_id: String)` | Cached unlock check |
-| `clear_achievement_cache()` | Clear the achievement cache |
+| `clear_achievement_cache()` | Clear local cache; call `request_achievements` to reload |
 
-Achievement dictionary keys: `achievement_id`, `game_id`, `name`, `description`, `locked_icon_url`, `unlocked_icon_url`, `unlocked`, `unlocked_at`.
+Achievement dictionary keys: `achievement_id`, `game_id`, `name`, `description`, `locked_icon_url`, `unlocked_icon_url`, `unlocked`, `unlocked_at` (`null` if locked).
 
 ### Stats
 
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `request_stats()` | `void` | Load stats from the server (call before get/set) |
-| `get_stat_int(stat_id: String)` | `Variant` | Integer stat, or `null` if missing |
-| `get_stat_float(stat_id: String)` | `Variant` | Float stat, or `null` if missing |
-| `set_stat_int(stat_id: String, value: int)` | `bool` | Set integer stat (cached locally) |
-| `set_stat_float(stat_id: String, value: float)` | `bool` | Set float stat (cached locally) |
+| `get_stat_int(stat_id: String)` | `Variant` | INT stat, or `null` if missing, not loaded, or not INT |
+| `get_stat_float(stat_id: String)` | `Variant` | FLOAT/AVGRATE stat, or `null` if missing, not loaded, or not float |
+| `set_stat_int(stat_id: String, value: int)` | `bool` | Set an existing INT dashboard stat (cached locally) |
+| `set_stat_float(stat_id: String, value: float)` | `bool` | Set an existing FLOAT/AVGRATE stat (cached locally) |
 | `store_stats()` | `void` | Upload modified stats; result on `stats_stored` |
 
 ### Signals
@@ -381,7 +381,7 @@ Achievement dictionary keys: `achievement_id`, `game_id`, `name`, `description`,
 | `achievement_unlocked` | `achievement_id: String`, `success: bool`, `error: String` | Unlock result |
 | `achievements_received` | `success: bool`, `achievements: Array`, `error: String` | Achievement list |
 | `stats_requested` | `success: bool`, `error: String` | Stats loaded |
-| `stats_stored` | `success: bool`, `result_text: String` | Stats stored |
+| `stats_stored` | `success: bool`, `result_text: String` | Stats stored. Branch on `success`; `result_text` is JSON on success |
 
 This SDK does not emit a client-disconnected signal. Handle process lifetime in your game if you need to react to the desktop client closing.
 
@@ -476,12 +476,15 @@ A working sample is `Samples/BasicIntegration`. Open this repository in Godot (o
 
 ## Common Pitfalls
 
-### Incorrect: Calling `get_user_id()` immediately after initialize
+### Incorrect: Calling `get_user_name()` or stats immediately after initialize
+
+`get_user_id` can return the session user id as soon as initialize succeeds. `get_user_name`, `request_user_info`, achievements, and stats still need `authentication_complete`.
 
 ```gdscript
 func _ready() -> void:
     Ludolio.initialize_with_app_id(1000)
-    print(Ludolio.get_user_id()) # Empty - authentication not complete
+    print(Ludolio.get_user_name()) # Empty - name is filled during authenticate
+    Ludolio.request_stats() # Fails - not authenticated yet
 ```
 
 ### Correct: Wait for `authentication_complete`
@@ -494,11 +497,13 @@ func _ready() -> void:
 
 func _on_init(success: bool, error: String) -> void:
     if success:
+        print(Ludolio.get_user_id()) # Valid after initialize
         Ludolio.authenticate()
 
 func _on_auth(success: bool, error: String) -> void:
     if success:
-        print(Ludolio.get_user_id()) # Now returns a valid user ID
+        print(Ludolio.get_user_name())
+        Ludolio.request_stats()
 ```
 
 ### Incorrect: Connecting signals after initialize
