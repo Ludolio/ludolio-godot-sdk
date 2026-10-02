@@ -332,6 +332,8 @@ Ludolio.authentication_complete.connect(func(success: bool, error: String) -> vo
 
 ### User
 
+> **Deprecated:** name and email are no longer populated. Use id as the player identifier.
+
 ##### `request_user_info()`
 
 Request full user information. Asynchronous. Result: `user_info_received`. The user must be authenticated.
@@ -347,8 +349,7 @@ func _on_user_info_received(success: bool, user_info: Dictionary, error: String)
     if not success:
         push_error(error)
         return
-    print("User: ", user_info.get("user_name", ""))
-    print("Email: ", user_info.get("email", ""))
+    print("User ID: ", user_info.get("user_id", ""))
 ```
 
 **Dictionary keys:**
@@ -356,8 +357,8 @@ func _on_user_info_received(success: bool, user_info: Dictionary, error: String)
 | Key | Type | Description |
 |-----|------|-------------|
 | `user_id` | `String` | Current user ID |
-| `user_name` | `String` | Display name |
-| `email` | `String` | Email address |
+| `user_name` | `String` | Deprecated. No longer populated. |
+| `email` | `String` | Deprecated. No longer populated. |
 
 ##### `get_user_id() -> String`
 
@@ -369,7 +370,7 @@ var user_id := Ludolio.get_user_id()
 
 ##### `get_user_name() -> String`
 
-Synchronous accessor for the current user name. Empty until `authenticate` succeeds.
+Deprecated. No longer populated. Use `get_user_id()`.
 
 ```gdscript
 var user_name := Ludolio.get_user_name()

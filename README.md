@@ -272,7 +272,7 @@ func _on_user_info_received(success: bool, user_info: Dictionary, error: String)
     if not success:
         push_error(error)
         return
-    print("Welcome, ", user_info.get("user_name", ""))
+    print("User ID: ", user_info.get("user_id", ""))
 ```
 
 **Important:** `get_user_name` and `request_user_info` are only available after `authentication_complete` fires with `success == true`. `get_user_id` is already valid after initialize succeeds.
@@ -338,7 +338,7 @@ All APIs live on the `Ludolio` Engine singleton.
 | `is_authenticated()` | `bool` | `true` if the user is authenticated |
 | `get_game_id()` | `String` | Current game ID |
 | `get_user_id()` | `String` | Current user ID after initialize (empty if not initialized) |
-| `get_user_name()` | `String` | Current user name (empty until authenticate succeeds) |
+| `get_user_name()` | `String` | Deprecated. No longer populated. |
 | `get_last_error()` | `String` | Last error message from the SDK |
 
 ### User
@@ -348,6 +348,8 @@ All APIs live on the `Ludolio` Engine singleton.
 | `request_user_info()` | Request full user info; result on `user_info_received` |
 
 `user_info` dictionary keys: `user_id`, `user_name`, `email`.
+
+> **Deprecated:** name and email are no longer populated. Use id as the player identifier.
 
 ### Achievements
 
@@ -483,7 +485,7 @@ A working sample is `Samples/BasicIntegration`. Open this repository in Godot (o
 ```gdscript
 func _ready() -> void:
     Ludolio.initialize_with_app_id(1000)
-    print(Ludolio.get_user_name()) # Empty - name is filled during authenticate
+    print(Ludolio.get_user_name()) # Deprecated and no longer populated
     Ludolio.request_stats() # Fails - not authenticated yet
 ```
 
